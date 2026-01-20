@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "v7_cli"
+version = "0.1.0"
+description = "V7 Go CLI - Command-line interface for V7 Go API"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+v7 = "v7_cli.cli:main"
+
+[dependency-groups]
+dev = [
+    "mypy>=1.15.0",
+    "ruff>=0.11.11",
+    "pytest>=8.3.4",
+    "python-dotenv>=1.0.0",
+]
+
+[tool.mypy]
+python_version = "3.11"
+check_untyped_defs = true
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+strict_optional = true
+warn_return_any = false  # Too noisy with dynamic JSON data
+warn_unused_configs = true
+exclude = ["tests/"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    # Docstring rules - too noisy for CLI tools
+    "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107",
+    "D200", "D203", "D205", "D212", "D400", "D401", "D403", "D415", "D417",
+    # Type checking imports
+    "TC001", "TC002",
+    # Annotations
+    "ANN202",    # Missing return type for private function
+    "ANN204",    # Missing return type for __init__
+    "ANN401",    # Any type - needed for JSON data
+    # Complexity (use # noqa for specific cases)
+    "FBT001", "FBT002",  # Boolean positional arguments
+    "PLR0913",   # Too many arguments
+    "PLR0912",   # Too many branches
+    "PLR0911",   # Too many return statements
+    "C901",      # Function complexity
+    # Style preferences
+    "TD002", "TD003", "FIX002",  # TODO formatting
+    "ERA001",    # Commented code
+    "COM812",    # Trailing comma
+    "PERF401",   # Use list comprehension
+    "SIM108",    # Use ternary operator
+    "B905",      # zip() without strict
+    "DTZ005",    # datetime.now() without tz
+    # Exception formatting - too strict for CLI
+    "TRY003", "EM101", "EM102",
+    # HTTP client specifics
+    "B904",      # raise from
+    "S310",      # URL security audit
+]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.format]
+skip-magic-trailing-comma = false
+
+[tool.ruff.lint.per-file-ignores]
+"v7_cli/cli.py" = ["T201"]  # print() is the CLI output mechanism
+"tests/**/*.py" = [
+    "S101", "ANN001", "ANN201", "PLR2004", "PLR0915", "S603", "S607", "BLE001", "T201",
+    "ARG001", "ARG002",  # Fixtures often unused in test signature
+    "RUF005",            # List concatenation style
+    "PLW1510",           # subprocess.run check arg
+    "SIM105",            # contextlib.suppress
+    "PT006",             # pytest parametrize type
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+# Don't run integration tests by default
+addopts = "-m 'not integration' -v --strict-markers --tb=short -ra"
+
+# Test discovery
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+# Markers
+markers = [
+    "integration: Integration tests requiring API credentials",
+    "unit: Unit tests (fast, no external dependencies)",
+]
