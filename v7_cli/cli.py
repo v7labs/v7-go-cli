@@ -191,6 +191,7 @@ def cmd_projects_get(client: V7Client, args: argparse.Namespace) -> None:
                 "description": project.description,
                 "created_at": project.created_at,
                 "folder_id": project.folder_id,
+                "parent_property": project.parent_property,
             }
         )
     except APIError as e:
@@ -379,7 +380,11 @@ def cmd_ent_create(client: V7Client, args: argparse.Namespace) -> None:
             except json.JSONDecodeError as e:
                 raise ValidationError(f"Invalid JSON in --fields: {e}")
 
-        entity = client.entities.create(args.project_id, fields=fields)
+        entity = client.entities.create(
+            args.project_id,
+            fields=fields,
+            parent_entity_id=getattr(args, "parent_entity_id", None),
+        )
         success_output(
             {
                 "id": entity.id,
@@ -712,6 +717,11 @@ Examples:
         "--fields",
         "-f",
         help="JSON object with field values to prefill (or - for stdin)",
+    )
+    e_create.add_argument(
+        "--parent",
+        dest="parent_entity_id",
+        help="Parent entity ID (required for collection projects)",
     )
     e_create.set_defaults(func=cmd_ent_create)
 

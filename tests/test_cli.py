@@ -20,6 +20,8 @@ from typing import Any
 
 import pytest
 
+from v7_cli.core.client import APIClient, APIError
+
 # =============================================================================
 # Configuration
 # =============================================================================
@@ -199,6 +201,156 @@ def _extract_list_data(data: Any) -> list[dict[str, Any]]:
     return []
 
 
+def _normalise_project_payload(data: dict[str, Any]) -> dict[str, Any]:
+    """Unwrap common project payload shapes."""
+    if isinstance(data.get("data"), dict):
+        data = data["data"]
+    if isinstance(data.get("project"), dict):
+        data = data["project"]
+    if isinstance(data.get("data"), dict) and isinstance(data["data"].get("project"), dict):
+        data = data["data"]["project"]
+    return data
+
+
+def _find_parent_project_id_by_scan(child_project_id: str, parent_property_id: str | None) -> str | None:
+    """Scan projects to find the parent project for a collection child."""
+    client = APIClient()
+    try:
+        projects = client.paginate_all("/projects")
+    except APIError as e:
+        raise AssertionError(f"projects list failed: {e}") from e
+
+    for project_item in projects:
+        if not isinstance(project_item, dict):
+            continue
+        project = _normalise_project_payload(project_item)
+        if project.get("id") == child_project_id:
+            continue
+        properties = project.get("properties")
+        if not isinstance(properties, list):
+            continue
+        for prop in properties:
+            if not isinstance(prop, dict):
+                continue
+            if parent_property_id and prop.get("id") == parent_property_id:
+                return project.get("id")
+            config = prop.get("config") or {}
+            sub_config = config.get("subproject_config") or config.get("subprojectConfig") or {}
+            child_id = sub_config.get("child_project_id") or sub_config.get("childProjectId")
+            if child_id == child_project_id:
+                return project.get("id")
+    return None
+
+
+def _resolve_parent_project_id(project_id: str, data: dict[str, Any]) -> str | None:
+    """Resolve parent project ID from a project payload."""
+    data = _normalise_project_payload(data)
+
+    parent_project_id = data.get("parent_project_id") or data.get("parentProjectId")
+    if parent_project_id:
+        return parent_project_id
+
+    parent_project = data.get("parent_project") or data.get("parentProject")
+    if isinstance(parent_project, dict):
+        parent_project_id = parent_project.get("id") or parent_project.get("project_id")
+        if parent_project_id:
+            return parent_project_id
+
+    parent_property = data.get("parent_property") or data.get("parentProperty")
+    if isinstance(parent_property, dict):
+        parent_project_id = (
+            parent_property.get("parent_project_id")
+            or parent_property.get("parentProjectId")
+            or parent_property.get("project_id")
+            or parent_property.get("projectId")
+        )
+        if parent_project_id:
+            return parent_project_id
+        parent_property_id = parent_property.get("id")
+        parent_project_id = _find_parent_project_id_by_scan(project_id, parent_property_id)
+        if parent_project_id:
+            return parent_project_id
+
+    properties = data.get("properties")
+    if isinstance(properties, list):
+        for prop in properties:
+            if not isinstance(prop, dict):
+                continue
+            parent_project_id = prop.get("parent_project_id") or prop.get("parentProjectId")
+            if parent_project_id:
+                return parent_project_id
+    return None
+
+
+def _parent_required(result: CLITestResult) -> bool:
+    """Check if create failed due to missing parent_entity_id."""
+    output = (result.stdout or "").lower()
+    return "parent_entity_id" in output and "required" in output
+
+
+def _get_project_details(project_id: str) -> dict[str, Any]:
+    """Fetch project details directly from the API."""
+    client = APIClient()
+    try:
+        data = client.workspace_get(f"/projects/{project_id}")
+    except APIError as e:
+        raise AssertionError(f"project get failed: {e}") from e
+    if not isinstance(data, dict):
+        raise TypeError("project get returned non-object JSON")
+    return _normalise_project_payload(data)
+
+
+def _resolve_parent_chain(project_id: str) -> list[str]:
+    """Resolve parent project chain from root -> target project."""
+    chain = [project_id]
+    seen = {project_id}
+    current = project_id
+    while True:
+        details = _get_project_details(current)
+        parent_id = _resolve_parent_project_id(current, details)
+        if not parent_id:
+            break
+        if parent_id in seen:
+            raise AssertionError("Detected parent project cycle")
+        seen.add(parent_id)
+        chain.append(parent_id)
+        current = parent_id
+    return list(reversed(chain))
+
+
+def _ensure_parent_entity_chain(project_id: str) -> str | None:
+    """Ensure parent entities exist for nested collection projects."""
+    chain = _resolve_parent_chain(project_id)
+    if len(chain) == 1:
+        return None
+
+    created = TEST_DATA.setdefault("created_parent_entity_ids", {})
+    parent_entity_id: str | None = None
+
+    # Create entities from root -> parent of target
+    for proj_id in chain[:-1]:
+        if proj_id in created:
+            parent_entity_id = created[proj_id]
+            continue
+
+        if parent_entity_id:
+            result = run_cli("ent", "create", proj_id, "--parent", parent_entity_id)
+        else:
+            result = run_cli("ent", "create", proj_id)
+
+        if result.success and result.stdout.strip():
+            try:
+                data = json.loads(result.stdout)
+                created[proj_id] = data.get("id")
+                parent_entity_id = created[proj_id]
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                raise AssertionError(f"parent entity create parse failed: {e}") from e
+        else:
+            raise AssertionError(f"parent entity create failed: {result.stderr or result.stdout}")
+
+    return parent_entity_id
+
+
 @pytest.fixture(scope="session")
 def discover_test_data(require_credentials):
     """Discover real IDs from the API for use in tests."""
@@ -213,10 +365,23 @@ def discover_test_data(require_credentials):
             if projects:
                 TEST_DATA["project_id"] = projects[0].get("id")
                 TEST_DATA["project_name"] = projects[0].get("name", "Unknown")
+                parent_project_id = _resolve_parent_project_id(TEST_DATA["project_id"], projects[0])
+                if parent_project_id:
+                    TEST_DATA["parent_project_id"] = parent_project_id
         except (json.JSONDecodeError, KeyError, TypeError) as e:
             discovery_errors.append(f"projects: {e}")
     elif not result.success:
         discovery_errors.append(f"projects list failed: {result.stderr or result.stdout}")
+
+    # Get project details (parent_property determines collection projects)
+    if TEST_DATA.get("project_id") and not TEST_DATA.get("parent_project_id"):
+        try:
+            data = _get_project_details(TEST_DATA["project_id"])
+            parent_project_id = _resolve_parent_project_id(TEST_DATA["project_id"], data)
+            if parent_project_id:
+                TEST_DATA["parent_project_id"] = parent_project_id
+        except AssertionError as e:
+            discovery_errors.append(str(e))
 
     # Get first hub
     result = run_cli("hub", "list")
@@ -280,6 +445,10 @@ def cleanup_test_data(request):
     # Cleanup created entities
     if TEST_DATA.get("created_entity_id") and TEST_DATA.get("project_id"):
         run_cli("ent", "delete", TEST_DATA["project_id"], TEST_DATA["created_entity_id"])
+    if TEST_DATA.get("created_parent_entity_ids"):
+        for project_id, entity_id in TEST_DATA["created_parent_entity_ids"].items():
+            if entity_id:
+                run_cli("ent", "delete", project_id, entity_id)
 
 
 # =============================================================================
@@ -417,6 +586,12 @@ class TestEntityEndpoint:
         if not TEST_DATA.get("project_id"):
             pytest.skip("No project available")
         result = run_cli("ent", "create", TEST_DATA["project_id"])
+        if not result.success and _parent_required(result):
+            parent_entity_id = _ensure_parent_entity_chain(TEST_DATA["project_id"])
+            if not parent_entity_id:
+                details = _get_project_details(TEST_DATA["project_id"])
+                raise AssertionError(f"parent required but parent_project_id missing: {details.get('parent_property')}")
+            result = run_cli("ent", "create", TEST_DATA["project_id"], "--parent", parent_entity_id)
         MATRIX.add(result)
         # Store created entity for cleanup
         if result.success:
@@ -432,6 +607,20 @@ class TestEntityEndpoint:
             pytest.skip("No project or property available")
         fields = json.dumps({TEST_DATA["property_slug"]: "test value from smoke test"})
         result = run_cli("ent", "create", TEST_DATA["project_id"], "--fields", fields)
+        if not result.success and _parent_required(result):
+            parent_entity_id = _ensure_parent_entity_chain(TEST_DATA["project_id"])
+            if not parent_entity_id:
+                details = _get_project_details(TEST_DATA["project_id"])
+                raise AssertionError(f"parent required but parent_project_id missing: {details.get('parent_property')}")
+            result = run_cli(
+                "ent",
+                "create",
+                TEST_DATA["project_id"],
+                "--fields",
+                fields,
+                "--parent",
+                parent_entity_id,
+            )
         MATRIX.add(result)
         # May fail if property doesn't accept text - that's ok
         assert result.exit_code in [0, 1], f"ent create --fields crashed: {result.stderr}"

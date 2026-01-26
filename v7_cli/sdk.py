@@ -6,6 +6,7 @@ Built on top of the core APIClient.
 """
 
 import builtins
+import json
 import time
 from collections.abc import Iterator
 from datetime import datetime
@@ -1078,8 +1079,6 @@ class HubOperations:
             return []
 
         try:
-            import json
-
             files_data = json.loads(files_json) if isinstance(files_json, str) else files_json
             if not isinstance(files_data, list):
                 return []

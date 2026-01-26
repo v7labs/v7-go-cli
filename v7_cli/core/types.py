@@ -59,6 +59,7 @@ class Project:
     folder_id: str | None = None
     main_view_id: str | None = None
     auto_recalculations: bool = True
+    parent_property: dict[str, Any] | None = None
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Project":
@@ -75,6 +76,7 @@ class Project:
             folder_id=data.get("folder_id"),
             main_view_id=data.get("main_view_id"),
             auto_recalculations=data.get("auto_recalculations", True),
+            parent_property=data.get("parent_property") or data.get("parentProperty"),
         )
 
 
