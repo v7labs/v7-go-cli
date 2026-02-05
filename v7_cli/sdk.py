@@ -78,6 +78,7 @@ class V7Client:
         self.exports = ExportOperations(self._client)
         self.invitations = InvitationOperations(self._client)
         self.templates = TemplateOperations(self._client)
+        self.hubs = HubOperations(self._client)
         self.search = SearchOperations(self._client)
 
     @property
