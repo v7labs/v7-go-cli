@@ -188,7 +188,7 @@ class APIClient:
             # Filter out None values and URL-encode
             filtered_params = {k: v for k, v in params.items() if v is not None}
             if filtered_params:
-                query_string = urllib.parse.urlencode(filtered_params)
+                query_string = urllib.parse.urlencode(filtered_params, doseq=True)
                 separator = "&" if "?" in path else "?"
                 path = f"{path}{separator}{query_string}"
         return self._make_request("GET", path)

@@ -444,3 +444,27 @@ class Hub:
             created_at=data.get("created_at"),
             updated_at=data.get("updated_at"),
         )
+
+
+@dataclass
+class SearchResult:
+    """A single vector search result from a hub."""
+
+    file_id: str
+    similarity: float
+    byte_start: int
+    byte_end: int
+    chunk_content: str | None = None
+    token_count: int | None = None
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "SearchResult":
+        """Create from API response dict."""
+        return cls(
+            file_id=data["file_id"],
+            similarity=data["similarity"],
+            byte_start=data["byte_start"],
+            byte_end=data["byte_end"],
+            chunk_content=data.get("chunk_content"),
+            token_count=data.get("token_count"),
+        )

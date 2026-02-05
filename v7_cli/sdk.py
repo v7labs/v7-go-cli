@@ -23,6 +23,7 @@ from v7_cli.core.types import (
     PaginatedResponse,
     Project,
     Property,
+    SearchResult,
     Template,
 )
 
@@ -77,7 +78,7 @@ class V7Client:
         self.exports = ExportOperations(self._client)
         self.invitations = InvitationOperations(self._client)
         self.templates = TemplateOperations(self._client)
-        self.hubs = HubOperations(self._client)
+        self.search = SearchOperations(self._client)
 
     @property
     def workspace_id(self) -> str | None:
@@ -1111,3 +1112,45 @@ class HubOperations:
 
         """
         return self._client.workspace_post(f"/hubs/{hub_id}/reindex")
+
+
+# =============================================================================
+# Search Operations
+# =============================================================================
+
+
+class SearchOperations:
+    """Operations for managing knowledge hubs."""
+
+    def __init__(self, client: APIClient):
+        self._client = client
+
+    def search(
+        self,
+        query: str,
+        hub_ids: builtins.list[str] | None = None,
+        file_ids: builtins.list[str] | None = None,
+        limit: int = 10,
+    ) -> builtins.list[SearchResult]:
+        """
+        Vector search across hub files.
+
+        Args:
+            query: The search text
+            hub_ids: Optional list of hub IDs to search within
+            file_ids: Optional list of file IDs to search within
+            limit: Maximum number of results
+
+        Returns:
+            List of search results
+
+        """
+        params: dict[str, Any] = {"query": query, "limit": limit}
+        if hub_ids is not None:
+            params["hub_ids[]"] = hub_ids
+        if file_ids is not None:
+            params["file_ids[]"] = file_ids
+
+        result = self._client.workspace_get("/search", params=params)
+        results = result.get("data", []) if isinstance(result, dict) else []
+        return [SearchResult.from_dict(r) for r in results]
