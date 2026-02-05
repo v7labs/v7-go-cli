@@ -610,6 +610,9 @@ def cmd_hub_search(client: V7Client, args: argparse.Namespace) -> None:
     try:
         hub_ids = args.hub_ids.split(",") if args.hub_ids else None
         file_ids = args.file_ids.split(",") if args.file_ids else None
+        if args.limit > 50:
+            print("Warning: limit capped at 50 (API maximum)", file=sys.stderr)
+            args.limit = 50
 
         results = client.search.search(
             query=args.query,
