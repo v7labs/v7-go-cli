@@ -17,6 +17,7 @@ from v7_cli.core.types import (
     AgentFixerSession,
     Entity,
     Export,
+    FileContent,
     Hub,
     HubFile,
     Invitation,
@@ -78,6 +79,7 @@ class V7Client:
         self.invitations = InvitationOperations(self._client)
         self.templates = TemplateOperations(self._client)
         self.hubs = HubOperations(self._client)
+        self.files = FileOperations(self._client)
 
     @property
     def workspace_id(self) -> str | None:
@@ -1111,3 +1113,41 @@ class HubOperations:
 
         """
         return self._client.workspace_post(f"/hubs/{hub_id}/reindex")
+
+
+# =============================================================================
+# File Operations
+# =============================================================================
+
+
+class FileOperations:
+    """Operations for reading file content."""
+
+    def __init__(self, client: APIClient):
+        self._client = client
+
+    def read_file(
+        self,
+        file_id: str,
+        start_byte: int | None = None,
+        end_byte: int | None = None,
+    ) -> FileContent:
+        """
+        Read file content, optionally within a byte range.
+
+        Args:
+            file_id: The file ID (UUID)
+            start_byte: Start byte offset (must pair with end_byte)
+            end_byte: End byte offset (must pair with start_byte)
+
+        Returns:
+            FileContent with content and actual byte boundaries
+
+        """
+        body: dict[str, Any] = {}
+        if start_byte is not None:
+            body["start_byte"] = start_byte
+        if end_byte is not None:
+            body["end_byte"] = end_byte
+        result = self._client.workspace_post(f"/files/{file_id}/read", body or None)
+        return FileContent.from_dict(result)

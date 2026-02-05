@@ -326,6 +326,11 @@ class TestHelpCommands:
         MATRIX.add(result)
         assert result.success, f"Export help failed: {result.stderr}"
 
+    def test_read_file_help(self):
+        result = run_cli("read-file", "--help")
+        MATRIX.add(result)
+        assert result.success, f"Read file help failed: {result.stderr}"
+
     def test_template_help(self):
         result = run_cli("template", "--help")
         MATRIX.add(result)
@@ -533,6 +538,56 @@ class TestHubEndpoint:
         MATRIX.add(result)
         # Should fail gracefully
         assert not result.success
+
+
+# =============================================================================
+# Read File Endpoint Tests
+# =============================================================================
+
+
+class TestReadFileEndpoint:
+    """Test read-file endpoint variations."""
+
+    def test_read_file_missing_id(self, discover_test_data):
+        """read-file with no file_id should fail (argparse error)."""
+        result = run_cli("read-file")
+        MATRIX.add(result)
+        assert not result.success, "read-file with no file_id should fail"
+
+    def test_read_file_invalid_id(self, discover_test_data):
+        """read-file with an invalid UUID should return a graceful error."""
+        result = run_cli("read-file", "invalid-file-id-12345")
+        MATRIX.add(result)
+        # Should fail with API error (403 since not-found returns 403)
+        assert not result.success, "read-file with invalid file_id should fail"
+
+    def test_read_file_only_start_byte(self, discover_test_data):
+        """Providing only --start-byte should fail client-side validation."""
+        result = run_cli("read-file", "019abc00-0000-0000-0000-000000000000", "--start-byte", "0")
+        MATRIX.add(result)
+        assert not result.success, "read-file with only --start-byte should fail"
+        assert "both" in result.stdout.lower() or "both" in result.stderr.lower()
+
+    def test_read_file_only_end_byte(self, discover_test_data):
+        """Providing only --end-byte should fail client-side validation."""
+        result = run_cli("read-file", "019abc00-0000-0000-0000-000000000000", "--end-byte", "1000")
+        MATRIX.add(result)
+        assert not result.success, "read-file with only --end-byte should fail"
+        assert "both" in result.stdout.lower() or "both" in result.stderr.lower()
+
+    def test_read_file_with_byte_range(self, discover_test_data):
+        """read-file with both byte args on an invalid ID should fail gracefully."""
+        result = run_cli(
+            "read-file",
+            "019abc00-0000-0000-0000-000000000000",
+            "--start-byte",
+            "0",
+            "--end-byte",
+            "1000",
+        )
+        MATRIX.add(result)
+        # Should fail with API error, not crash
+        assert result.exit_code in [0, 1], f"read-file with byte range crashed: {result.stderr}"
 
 
 # =============================================================================

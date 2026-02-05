@@ -572,6 +572,46 @@ def cmd_hub_get(client: V7Client, args: argparse.Namespace) -> None:
         error_output(e)
 
 
+def cmd_read_file(client: V7Client, args: argparse.Namespace) -> None:
+    """Read file content by ID, optionally within a byte range."""
+    try:
+        # Client-side validation: both or neither byte arguments
+        has_start = args.start_byte is not None
+        has_end = args.end_byte is not None
+        if has_start != has_end:
+            raise ValidationError("Both --start-byte and --end-byte must be provided, or both omitted")
+
+        # Client-side warning: byte range exceeds 100KB
+        if has_start and has_end and args.end_byte - args.start_byte > 100_000:
+            print(
+                "Warning: Byte range exceeds 100,000 bytes. The API will clamp to start_byte + 100,000.",
+                file=sys.stderr,
+            )
+
+        result = client.files.read_file(
+            args.file_id,
+            start_byte=args.start_byte,
+            end_byte=args.end_byte,
+        )
+
+        if is_tty():
+            print(f"File: {result.file_id}")
+            print(f"Bytes: {result.actual_byte_start} - {result.actual_byte_end}")
+            print()
+            print(result.content)
+        else:
+            success_output(
+                {
+                    "file_id": result.file_id,
+                    "content": result.content,
+                    "actual_byte_start": result.actual_byte_start,
+                    "actual_byte_end": result.actual_byte_end,
+                }
+            )
+    except CLIError as e:
+        error_output(e)
+
+
 def cmd_hub_files(client: V7Client, args: argparse.Namespace) -> None:
     """List files in a hub."""
     try:
@@ -792,6 +832,13 @@ Examples:
     h_files = hub_sub.add_parser("files", help="List files in hub")
     h_files.add_argument("hub_id", help="Hub ID")
     h_files.set_defaults(func=cmd_hub_files)
+
+    # ========== Read File ==========
+    read_file = subparsers.add_parser("read-file", help="Read file content by ID")
+    read_file.add_argument("file_id", help="File ID (UUID)")
+    read_file.add_argument("--start-byte", "-s", type=int, help="Start byte offset (must pair with --end-byte)")
+    read_file.add_argument("--end-byte", "-e", type=int, help="End byte offset (must pair with --start-byte)")
+    read_file.set_defaults(func=cmd_read_file)
 
     return parser
 

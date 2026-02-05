@@ -392,6 +392,31 @@ class Template:
 
 
 # =============================================================================
+# File Content Types
+# =============================================================================
+
+
+@dataclass
+class FileContent:
+    """Response from reading file content."""
+
+    file_id: str
+    content: str
+    actual_byte_start: int
+    actual_byte_end: int
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "FileContent":
+        """Create from API response dict."""
+        return cls(
+            file_id=data["file_id"],
+            content=data["content"],
+            actual_byte_start=data["actual_byte_start"],
+            actual_byte_end=data["actual_byte_end"],
+        )
+
+
+# =============================================================================
 # Hub Types
 # =============================================================================
 
