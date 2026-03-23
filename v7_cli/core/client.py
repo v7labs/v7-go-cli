@@ -170,13 +170,16 @@ class APIClient:
                 raise APIError(str(e), status=e.code)
 
         except urllib.error.URLError as e:
-            raise APIError(f"Connection error: {e.reason}")
+            raise APIError(f"Connection error: {e.reason} ({method} {path})")
 
         except TimeoutError:
-            raise APIError(f"Request timed out after {request_timeout} seconds")
+            raise APIError(
+                f"Request timed out after {request_timeout}s ({method} {path}). "
+                f"Use --timeout to increase (e.g. --timeout 300)"
+            )
 
         except json.JSONDecodeError as e:
-            raise APIError(f"Invalid JSON response: {e}")
+            raise APIError(f"Invalid JSON response: {e} ({method} {path})")
 
     # =========================================================================
     # HTTP Methods
