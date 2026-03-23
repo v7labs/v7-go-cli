@@ -629,6 +629,7 @@ Examples:
 """,
     )
     parser.add_argument("--workspace", "-w", help="Workspace ID (overrides V7_GO_WORKSPACE_ID)")
+    parser.add_argument("--timeout", "-t", type=int, default=60, help="Request timeout in seconds (default: 60)")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
 
     # ========== Agent Builder ==========
@@ -806,7 +807,7 @@ def main() -> None:
         sys.exit(0)
 
     # Create client
-    client = V7Client(workspace_id=args.workspace)
+    client = V7Client(workspace_id=args.workspace, timeout=args.timeout)
 
     # Run command (all subparsers have default funcs that print help)
     args.func(client, args)
