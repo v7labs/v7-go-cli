@@ -339,19 +339,6 @@ class ProjectOperations:
         result = self._client.workspace_get(f"/projects/{project_id}")
         return Project.from_dict(result)
 
-    def delete(self, project_id: str) -> bool:
-        """
-        Delete a project.
-
-        Args:
-            project_id: The project ID
-
-        Returns:
-            True on success
-
-        """
-        self._client.workspace_delete(f"/projects/{project_id}")
-        return True
 
 
 # =============================================================================
@@ -538,20 +525,6 @@ class EntityOperations:
         """
         return self._client.workspace_post(f"/projects/{project_id}/entities/{entity_id}/recalculate")
 
-    def delete(self, project_id: str, entity_id: str) -> bool:
-        """
-        Delete an entity.
-
-        Args:
-            project_id: The project ID
-            entity_id: The entity ID
-
-        Returns:
-            True on success
-
-        """
-        self._client.workspace_delete(f"/projects/{project_id}/entities/{entity_id}")
-        return True
 
 
 # =============================================================================
@@ -561,12 +534,6 @@ class EntityOperations:
 
 class PropertyOperations:
     """Operations for managing properties (columns)."""
-
-    NOT_IMPLEMENTED_MESSAGE = (
-        "Direct property creation is not supported via CLI.\n"
-        "Use 'v7 agent create' to create a new agent with properties, or\n"
-        "use 'v7 agent fix <project_id>' to add properties to an existing agent."
-    )
 
     def __init__(self, client: APIClient):
         self._client = client
@@ -600,40 +567,6 @@ class PropertyOperations:
         result = self._client.workspace_get(f"/projects/{project_id}/properties/{property_id_or_slug}")
         return Property.from_dict(result)
 
-    def add_from_prompt(self, project_id: str, prompt: str) -> Property:
-        """
-        Add a property using AI-powered configuration.
-
-        Note: This is an internal method. For CLI users, use agent builder/fixer.
-
-        Args:
-            project_id: The project ID
-            prompt: Description of the property
-
-        Returns:
-            Created Property
-
-        """
-        result = self._client.workspace_post(
-            f"/projects/{project_id}/properties/from_prompt",
-            {"prompt": prompt},
-        )
-        return Property.from_dict(result)
-
-    def delete(self, project_id: str, property_id_or_slug: str) -> bool:
-        """
-        Delete a property.
-
-        Args:
-            project_id: The project ID
-            property_id_or_slug: Property ID or slug
-
-        Returns:
-            True on success
-
-        """
-        self._client.workspace_delete(f"/projects/{project_id}/properties/{property_id_or_slug}")
-        return True
 
 
 # =============================================================================
@@ -818,19 +751,6 @@ class InvitationOperations:
         )
         return result.get("data", [])
 
-    def delete(self, invitation_id: str) -> bool:
-        """
-        Cancel a pending invitation.
-
-        Args:
-            invitation_id: The invitation ID
-
-        Returns:
-            True on success
-
-        """
-        self._client.workspace_delete(f"/invitations/{invitation_id}")
-        return True
 
 
 # =============================================================================
@@ -1040,20 +960,6 @@ class HubOperations:
 
         result = self._client.workspace_post("/hubs", data)
         return Hub.from_dict(result)
-
-    def delete(self, hub_id: str) -> bool:
-        """
-        Delete a hub.
-
-        Args:
-            hub_id: The hub ID
-
-        Returns:
-            True on success
-
-        """
-        self._client.workspace_delete(f"/hubs/{hub_id}")
-        return True
 
     def list_files(self, hub_id: str) -> builtins.list[HubFile]:
         """

@@ -197,15 +197,6 @@ def cmd_projects_get(client: V7Client, args: argparse.Namespace) -> None:
         error_output(e)
 
 
-def cmd_projects_delete(client: V7Client, args: argparse.Namespace) -> None:
-    """Delete a project."""
-    try:
-        client.projects.delete(args.project_id)
-        success_output({"success": True, "message": f"Project {args.project_id} deleted"})
-    except APIError as e:
-        error_output(e)
-
-
 def cmd_props_list(client: V7Client, args: argparse.Namespace) -> None:
     """List properties for a project."""
     try:
@@ -248,18 +239,6 @@ def cmd_props_list(client: V7Client, args: argparse.Namespace) -> None:
         error_output(e)
 
 
-def cmd_props_add(_client: V7Client, _args: argparse.Namespace) -> None:
-    """Add a property - redirects to agent builder."""
-    print("Direct property creation is not supported via CLI.", file=sys.stderr)
-    print(file=sys.stderr)
-    print("Use the agent builder instead:", file=sys.stderr)
-    print(
-        '  v7 agent_builder create "<prompt>"  - Create a new agent with properties',
-        file=sys.stderr,
-    )
-    sys.exit(1)
-
-
 def cmd_props_get(client: V7Client, args: argparse.Namespace) -> None:
     """Get property details."""
     try:
@@ -275,15 +254,6 @@ def cmd_props_get(client: V7Client, args: argparse.Namespace) -> None:
                 "tool_config": prop.tool_config,
             }
         )
-    except APIError as e:
-        error_output(e)
-
-
-def cmd_props_delete(client: V7Client, args: argparse.Namespace) -> None:
-    """Delete a property."""
-    try:
-        client.properties.delete(args.project_id, args.property_id)
-        success_output({"success": True, "message": f"Property {args.property_id} deleted"})
     except APIError as e:
         error_output(e)
 
@@ -416,15 +386,6 @@ def cmd_ent_recalc(client: V7Client, args: argparse.Namespace) -> None:
     try:
         result = client.entities.recalculate(args.project_id, args.entity_id)
         success_output(result)
-    except APIError as e:
-        error_output(e)
-
-
-def cmd_ent_delete(client: V7Client, args: argparse.Namespace) -> None:
-    """Delete an entity."""
-    try:
-        client.entities.delete(args.project_id, args.entity_id)
-        success_output({"success": True, "message": f"Entity {args.entity_id} deleted"})
     except APIError as e:
         error_output(e)
 
@@ -668,10 +629,6 @@ Examples:
     p_get.add_argument("project_id", help="Project ID")
     p_get.set_defaults(func=cmd_projects_get)
 
-    p_delete = projects_sub.add_parser("delete", help="Delete a project")
-    p_delete.add_argument("project_id", help="Project ID")
-    p_delete.set_defaults(func=cmd_projects_delete)
-
     # ========== Properties ==========
     props = subparsers.add_parser("props", help="Manage properties (columns)")
     props.set_defaults(func=lambda _c, _a: props.print_help())
@@ -681,20 +638,10 @@ Examples:
     pr_list.add_argument("project_id", help="Project ID")
     pr_list.set_defaults(func=cmd_props_list)
 
-    pr_add = props_sub.add_parser("add", help="Add property (use agent builder instead)")
-    pr_add.add_argument("project_id", help="Project ID")
-    pr_add.add_argument("prompt", help="Property description")
-    pr_add.set_defaults(func=cmd_props_add)
-
     pr_get = props_sub.add_parser("get", help="Get property details")
     pr_get.add_argument("project_id", help="Project ID")
     pr_get.add_argument("property_id", help="Property ID or slug")
     pr_get.set_defaults(func=cmd_props_get)
-
-    pr_delete = props_sub.add_parser("delete", help="Delete a property")
-    pr_delete.add_argument("project_id", help="Project ID")
-    pr_delete.add_argument("property_id", help="Property ID or slug")
-    pr_delete.set_defaults(func=cmd_props_delete)
 
     # ========== Entities ==========
     ent = subparsers.add_parser("ent", help="Manage entities (rows)")
@@ -733,11 +680,6 @@ Examples:
     e_recalc.add_argument("project_id", help="Project ID")
     e_recalc.add_argument("entity_id", help="Entity ID")
     e_recalc.set_defaults(func=cmd_ent_recalc)
-
-    e_delete = ent_sub.add_parser("delete", help="Delete an entity")
-    e_delete.add_argument("project_id", help="Project ID")
-    e_delete.add_argument("entity_id", help="Entity ID")
-    e_delete.set_defaults(func=cmd_ent_delete)
 
     # ========== Export ==========
     export = subparsers.add_parser("export", help="Export project data")
