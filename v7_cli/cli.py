@@ -566,6 +566,60 @@ def cmd_hub_files(client: V7Client, args: argparse.Namespace) -> None:
         error_output(e)
 
 
+def cmd_hub_search(client: V7Client, args: argparse.Namespace) -> None:
+    """Search across hub files using vector search."""
+    try:
+        hub_ids = args.hub_ids.split(",") if args.hub_ids else None
+        file_ids = args.file_ids.split(",") if args.file_ids else None
+        if args.limit > 50:
+            print("Warning: limit capped at 50 (API maximum)", file=sys.stderr)
+            args.limit = 50
+
+        results = client.search.search(
+            query=args.query,
+            hub_ids=hub_ids,
+            file_ids=file_ids,
+            limit=args.limit,
+        )
+
+        if is_tty():
+            if not results:
+                print("No results found.")
+                return
+
+            table_output(
+                ["File ID", "Similarity", "Bytes", "Content"],
+                [
+                    [
+                        r.file_id,
+                        f"{r.similarity:.4f}",
+                        f"{r.byte_start}-{r.byte_end}",
+                        (r.chunk_content or "")[:80],
+                    ]
+                    for r in results
+                ],
+                [36, 12, 16, 80],
+            )
+        else:
+            success_output(
+                {
+                    "data": [
+                        {
+                            "file_id": r.file_id,
+                            "similarity": r.similarity,
+                            "byte_start": r.byte_start,
+                            "byte_end": r.byte_end,
+                            "chunk_content": r.chunk_content,
+                            "token_count": r.token_count,
+                        }
+                        for r in results
+                    ]
+                }
+            )
+    except APIError as e:
+        error_output(e)
+
+
 # =============================================================================
 # Main CLI
 # =============================================================================
@@ -592,6 +646,14 @@ Examples:
     parser.add_argument("--workspace", "-w", help="Workspace ID (overrides V7_GO_WORKSPACE_ID)")
     parser.add_argument("--timeout", "-t", type=int, default=60, help="Request timeout in seconds (default: 60)")
     subparsers = parser.add_subparsers(dest="command", help="Commands")
+
+    # ========== Search ==========
+    h_search = subparsers.add_parser("search", help="Vector search across hub files")
+    h_search.add_argument("query", help="Search text")
+    h_search.add_argument("--hub-ids", "-H", help="Comma-separated list of hub IDs")
+    h_search.add_argument("--file-ids", "-F", help="Comma-separated list of file IDs")
+    h_search.add_argument("--limit", "-l", type=int, default=10, help="Max results (default: 10)")
+    h_search.set_defaults(func=cmd_hub_search)
 
     # ========== Agent Builder ==========
     agent = subparsers.add_parser("agent_builder", help="Create agents from natural language")
